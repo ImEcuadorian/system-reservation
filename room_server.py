@@ -3,9 +3,9 @@ import Pyro4
 from room import Room
 
 rooms = [
-    Room("Room A"),
-    Room("Room B"),
-    Room("Room C"),
+    Room("Sala A"),
+    Room("Sala B"),
+    Room("Sala C"),
 ]
 
 reservations = []
@@ -16,7 +16,7 @@ class RoomManager:
     def list_rooms(self):
         return [room.name for room in rooms]
 
-    def check_availability(self, room, date, start_time, end_time):
+    def check_availability(self, room, date:str, start_time, end_time):
         date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
         start_time = datetime.datetime.strptime(start_time, "%H:%M").time()
         end_time = datetime.datetime.strptime(end_time, "%H:%M").time()
@@ -26,40 +26,37 @@ class RoomManager:
                     return False
         return True
 
-    def reserve_room(self, username, room, date, start_time, end_time):
+    def reserve_room(self, username, room, d:str, start_time, end_time):
         auth = Pyro4.Proxy("PYRONAME:auth_server")
         if not auth.is_logged_in(username):
-            return "User not logged in"
+            return "Usuario no autenticado"
 
-        date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
+        fecha = datetime.datetime.strptime(d, "%Y-%m-%d").date()
         start = datetime.datetime.strptime(start_time, "%H:%M").time()
-        end = datetime.datetime.strptime(end_time, "%H:%M").time()
+        end_obj = datetime.datetime.strptime(end_time, "%H:%M").time()
 
         now = datetime.datetime.now()
-        initial = datetime.datetime.combine(date, start)
-        end = datetime.datetime.combine(date, end)
-        duration = (end - initial).total_seconds() / 60
+        reserva_inicio = datetime.datetime.combine(fecha, start)
+        reserva_fin = datetime.datetime.combine(fecha, end_obj)
+        duracion = (reserva_fin - reserva_inicio).total_seconds() / 60
 
-        if initial < now:
-            return "You can't reserve a room in the past"
-        if duration < 30 or duration > 240:
-            return "The duration must be between 30 and 4 hours"
+        if reserva_inicio < now:
+            return "No se puede reservar en el pasado"
+        if duracion < 30 or duracion > 240:
+            return "La reserva debe ser entre 30 minutos y 4 horas"
 
-        user_reservations = [r for r in reservations if r['username'] == username and r['date'] == date]
-        if len(user_reservations) >= 2:
-            return "You can't reserve more than 2 rooms at the same time"
-
-        if not self.check_availability(room, date, start_time, end_time):
-            return "Room not available"
+        reservas_usuario = [r for r in reservations if r['username'] == username and r['date'] == d]
+        if len(reservas_usuario) >= 2:
+            return "No puede reservar más de 2 veces el mismo día"
 
         reservations.append({
             'username': username,
             'room': room,
-            'date': date,
+            'date': fecha,
             'start_time': start,
-            'end_time': end
+            'end_time': end_obj
         })
-        return "Room reserved successfully"
+        return "Reserva realizada con éxito"
 
     def cancel_reservation(self, username, room, date, start_time, end_time):
         date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
@@ -69,17 +66,17 @@ class RoomManager:
             if (r['username'] == username and r['room'] == room and r['date'] == date and
                 r['start_time'] == start and r['end_time'] == end):
                 reservations.remove(r)
-                return "Reservation cancelled successfully"
-        return "Reservation not found"
+                return "Reserva cancelada"
+        return "No se encontró la reserva o no tiene permisos para cancelarla"
 
     def get_user_reservations(self, username):
         now = datetime.datetime.now()
         return [
             {
                 'room': r['room'],
-                'date': r['date'].strftime("%Y-%m-%d"),
-                'start_time': r['start_time'].strftime("%H:%M"),
-                'end_time': r['end_time'].strftime("%H:%M")
+                'date': r['date'],
+                'start_time': r['start_time'],
+                'end_time': r['end_time']
             }
             for r in reservations
             if r['username'] == username and
